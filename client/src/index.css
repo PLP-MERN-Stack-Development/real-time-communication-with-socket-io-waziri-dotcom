@@ -1,0 +1,36 @@
+/* client/src/index.css */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+  background-color: #1d72b8;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 14px;
+  transition: 0.2s;
+}
+
+button:hover {
+  background-color: #155d8a;
+}
+
+input {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 8px;
+}
+input:focus {
+  outline: none;
+  border-color: #1d72b8;
+  box-shadow: 0 0 5px rgba(29, 114, 184, 0.5);
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Chumbi Nyiri - Real-time chat app backend using Express and Socket.io (CommonJS)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "socket.io",
+    "express",
+    "chat-app",
+    "real-time",
+    "commonjs"
+  ],
+  "author": "Chumbi Nyiri Dev Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mongoose": "^8.19.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.10"
+  },
+  "type": "commonjs"
+}

@@ -1,132 +1,99 @@
-// server.js - Main server file for Socket.io chat application
+// server/server.js
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const { Server } = require("socket.io");
+const config = require("./config");
 
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
-
-// Load environment variables
-dotenv.config();
-
-// Initialize Express app
 const app = express();
 const server = http.createServer(app);
+
+app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
+app.use(express.json());
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    credentials: true,
+    origin: config.CLIENT_URL,
+    methods: ["GET", "POST"],
   },
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Track online users
+let onlineUsers = new Map(); // socket.id -> username
+let userSockets = new Map(); // username -> socket.id
 
-// Store connected users and messages
-const users = {};
-const messages = [];
-const typingUsers = {};
+io.on("connection", (socket) => {
+  const username = socket.handshake.query.username;
+  if (username) {
+    onlineUsers.set(socket.id, username);
+    userSockets.set(username, socket.id);
 
-// Socket.io connection handler
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+    console.log(`✅ ${username} connected`);
+    io.emit("users:update", Array.from(onlineUsers.values()));
+  }
 
-  // Handle user joining
-  socket.on('user_join', (username) => {
-    users[socket.id] = { username, id: socket.id };
-    io.emit('user_list', Object.values(users));
-    io.emit('user_joined', { username, id: socket.id });
-    console.log(`${username} joined the chat`);
+  // 🟢 Global messages
+  socket.on("chat:message", (msg) => {
+    io.emit("chat:message", msg);
   });
 
-  // Handle chat messages
-  socket.on('send_message', (messageData) => {
+  // 🟡 Typing indicator
+  socket.on("user:typing", (username) => {
+    socket.broadcast.emit("user:typing", username);
+  });
+
+  // 🟣 Private message
+  socket.on("private:message", ({ sender, receiver, text }) => {
+    const targetSocketId = userSockets.get(receiver);
     const message = {
-      ...messageData,
-      id: Date.now(),
-      sender: users[socket.id]?.username || 'Anonymous',
-      senderId: socket.id,
+      sender,
+      receiver,
+      text,
       timestamp: new Date().toISOString(),
     };
-    
-    messages.push(message);
-    
-    // Limit stored messages to prevent memory issues
-    if (messages.length > 100) {
-      messages.shift();
-    }
-    
-    io.emit('receive_message', message);
-  });
 
-  // Handle typing indicator
-  socket.on('typing', (isTyping) => {
-    if (users[socket.id]) {
-      const username = users[socket.id].username;
-      
-      if (isTyping) {
-        typingUsers[socket.id] = username;
-      } else {
-        delete typingUsers[socket.id];
-      }
-      
-      io.emit('typing_users', Object.values(typingUsers));
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("private:message", message);
+    }
+
+    // Optional: send delivery confirmation
+    socket.emit("private:delivered", message);
+
+    // Also send notification
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("notify:message", {
+        title: "New Message 💬",
+        body: `Message from ${sender}`,
+      });
     }
   });
 
-  // Handle private messages
-  socket.on('private_message', ({ to, message }) => {
-    const messageData = {
-      id: Date.now(),
-      sender: users[socket.id]?.username || 'Anonymous',
-      senderId: socket.id,
-      message,
-      timestamp: new Date().toISOString(),
-      isPrivate: true,
-    };
-    
-    socket.to(to).emit('private_message', messageData);
-    socket.emit('private_message', messageData);
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    if (users[socket.id]) {
-      const { username } = users[socket.id];
-      io.emit('user_left', { username, id: socket.id });
-      console.log(`${username} left the chat`);
-    }
-    
-    delete users[socket.id];
-    delete typingUsers[socket.id];
-    
-    io.emit('user_list', Object.values(users));
-    io.emit('typing_users', Object.values(typingUsers));
+  // 🔴 User disconnects
+  socket.on("disconnect", () => {
+    const name = onlineUsers.get(socket.id);
+    onlineUsers.delete(socket.id);
+    userSockets.delete(name);
+    console.log(`❌ ${name || "Unknown"} disconnected`);
+    io.emit("users:update", Array.from(onlineUsers.values()));
   });
 });
 
-// API routes
-app.get('/api/messages', (req, res) => {
-  res.json(messages);
+app.get("/", (req, res) => {
+  res.send("💬 Chumbi Nyiri server is live");
 });
 
-app.get('/api/users', (req, res) => {
-  res.json(Object.values(users));
+server.listen(config.PORT, () => {
+  console.log(`🚀 Server running on port ${config.PORT}`);
 });
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('Socket.io Chat Server is running');
-});
+const path = require("path");
 
-// Start server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Serve React build files in production
+if (process.env.NODE_ENV === "production") {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  app.use(express.static(clientBuildPath));
 
-module.exports = { app, server, io }; 
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
+}

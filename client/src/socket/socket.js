@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // socket.js - Socket.io client setup
 
 import { io } from 'socket.io-client';
@@ -147,3 +148,14 @@ export const useSocket = () => {
 };
 
 export default socket; 
+=======
+import { io } from 'socket.io-client';
+
+const URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+const socket = io(URL, {
+  autoConnect: false,
+  transports: ['websocket', 'polling']
+});
+
+export default socket;
+>>>>>>> 79d4fc2 (Initial commit - socket io)
